@@ -191,6 +191,7 @@ ORDER BY
     company_name, day;
 
 
+
 see visualization (Task_7.png) in the repository 
 
 
