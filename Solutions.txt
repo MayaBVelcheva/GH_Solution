@@ -144,3 +144,54 @@ ADD Job_Duration_Days INT;
 UPDATE Job_Postings
 SET Job_Duration_Days = DATEDIFF(Updated_At, Posted_At)
 WHERE State = 'expired'; --only in the "expired" lines we have the relevant posted and updated dates
+
+---Task 7
+
+Script to create the visualization table:
+
+WITH date_range AS (
+    SELECT
+        GENERATE_DATE_ARRAY('2020-10-29', '2022-12-14', INTERVAL 1 DAY) AS day_array
+),
+
+dates AS (
+    SELECT
+        day
+    FROM
+        date_range, 
+        UNNEST(day_array) AS day
+)
+
+SELECT
+    day,
+    company_name,
+    id,
+    last_active,
+    posted_at
+FROM
+    dates d
+LEFT JOIN (
+    SELECT DISTINCT
+        Company_Name,
+        id,
+        DATE(updated_at) - 1 AS last_active,
+        DATE(posted_at) AS posted_at
+    FROM 
+        `goh_jobs` j
+    LEFT JOIN
+        `goh_companies` c 
+    ON 
+        j.company_id = c.Company_ID
+    WHERE
+        state NOT IN ("posted", "osted") -- This takes the period between posted and cancelled/expired minus one day, i.e., all the days that a job has status posted
+) b 
+ON 
+    day BETWEEN posted_at AND last_active
+ORDER BY
+    company_name, day;
+
+
+see visualization (Task_7.png) in the repository 
+
+
+
