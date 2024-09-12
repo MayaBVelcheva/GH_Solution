@@ -1,0 +1,146 @@
+Solutions
+Task 1.
+--there are two duplicated rows
+
+SELECT  
+location,
+j.zip,
+COUNT(DISTINCT id) as most_jobs --to avoid duplication for ids which have record for both posted and expired
+FROM `goh_jobs` j
+LEFT JOIN
+`goh_locations` l ON j.zip = l.zip_code
+WHERE id NOT IN (SELECT DISTINCT
+id
+FROM
+`goh_jobs` 
+WHERE state IN ("cancelled", "canceled") )
+GROUP BY
+j.zip, location
+ORDER BY most_jobs DESC
+
+
+ANSWER
+location zip most_jobs
+Tarth   35786   15
+Dorne   80976   15
+
+
+--Task 2
+SELECT  
+LAST_DAY(DATE(updated_at), month) as month, --using updated_at because this is the time when the status is changed to cancelled, posted_at is the point when the job was created and stays unchanged
+COUNT(DISTINCT id) as cancelled_jobs --to avoid duplication for ids which have record for both posted and expired
+FROM `goh_jobs` 
+WHERE state IN ("cancelled", "canceled")
+GROUP BY
+month
+ORDER BY cancelled_jobs DESC
+
+ANSWER
+
+month       cancelled_jobs
+2021-06-30  4
+
+--Task 3
+SELECT  
+Company_Name,
+ROUND((COUNT(DISTINCT id)/Number_of_Employees)*100, 2) as ratio_posted_employees
+FROM `goh_jobs` j
+LEFT JOIN
+`goh_companies` c ON j.company_id = c.Company_ID
+GROUP BY
+Company_Name, Number_of_Employees
+ORDER BY ratio_posted_employees DESC
+
+ANSWER
+
+Company_Name ratio_posted_employees
+Echo Enterprises          4.71   
+Best Corp.                4.37
+Bright Future Enterprises 3.6
+Infinite Solutions        2.75
+Fast Track Inc.           2.67
+Acme Inc.                 2.23
+Delta Inc.                1.96
+Global Enterprises        1.79
+High Hopes Inc.           1.23
+
+--Task 4
+The dimensional model for the provided data would be a star schema which will include a fact table and dimension tables.
+
+The fact table will be based on jobs.json and will hold the measurable data. 
+The dimension will be bsed on companies.json and locations.csv. These tables will contain the descriptive information about entities, such as companies.
+
+SQL to create the fact table:
+
+CREATE TABLE Job_Postings (
+    Job_ID INT PRIMARY KEY,
+    Company_ID INT,  -- Foreign key to the Company dimension
+    Location_Zip INT,  -- Foreign key to the Location dimension
+    Price DECIMAL(10, 2),
+    State VARCHAR(50),
+    Posted_At DATETIME,
+    Updated_At DATETIME
+);
+
+CREATE TABLE Company (
+    Company_ID INT PRIMARY KEY,
+    Company_Name VARCHAR(255),
+    Establishment_Date DATE,
+    Number_Of_Employees INT
+);
+
+CREATE TABLE Location (
+    Zip INT PRIMARY KEY,
+    City VARCHAR(255),
+    State VARCHAR(255)
+);
+
+
+----Task 5
+SELECT
+ROW_NUMBER() OVER (PARTITION BY Company_Name ORDER BY DATE(posted_at)) as job_row,
+Company_Name,
+posted_at,
+id
+FROM
+(SELECT DISTINCT
+Company_Name,
+DATE(posted_at) as posted_at,
+id
+FROM `goh_jobs` j
+LEFT JOIN
+`goh_companies` c ON j.company_id = c.Company_ID
+)
+ORDER BY Company_Name, posted_at 
+
+job_row Company_Name posted_at  id
+1   Acme Inc.   2021-06-04      74
+2   Acme Inc.   2021-07-29      51
+3   Acme Inc.   2021-08-12      23
+4   Acme Inc.   2021-09-11      94
+5   Acme Inc.   2021-10-28      12
+6   Acme Inc.   2022-03-05      75
+7   Acme Inc.   2022-08-11      7
+8   Acme Inc.   2022-10-06      25
+9   Acme Inc.   2022-12-02      87
+1   Best Corp.  2020-12-15      13
+2   Best Corp.  2021-01-25      68
+3   Best Corp.  2021-03-06      8
+4   Best Corp.  2021-10-16      88
+5   Best Corp.  2021-11-22      78
+6   Best Corp.  2022-05-16      64
+7   Best Corp.  2022-06-29      19
+8   Best Corp.  2022-07-11      31
+9   Best Corp.  2022-11-27      97
+10  Best Corp.  2022-12-12      34
+...(continues)
+
+---Task 6
+The duration of jobs will need to be added as a new field to the job_postings table:
+
+ALTER TABLE Job_Postings
+ADD Job_Duration_Days INT;
+
+UPDATE Job_Postings
+SET Job_Duration_Days = DATEDIFF(Updated_At, Posted_At)
+WHERE State = 'expired'; --only in the "expired" lines we have the relevant posted and updated dates
